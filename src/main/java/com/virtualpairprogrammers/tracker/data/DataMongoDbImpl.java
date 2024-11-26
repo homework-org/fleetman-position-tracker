@@ -1,7 +1,8 @@
 package com.virtualpairprogrammers.tracker.data;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.TreeSet;
 
@@ -21,6 +22,7 @@ import com.virtualpairprogrammers.tracker.domain.VehiclePosition;
  * to a K8S cluster.
  */
 @Repository
+@Profile({"localhost", "production-microservice", "local-microservice"})
 public class DataMongoDbImpl implements Data {
 
 	@Autowired
@@ -28,7 +30,9 @@ public class DataMongoDbImpl implements Data {
 	
 	@Override
 	public void updatePosition(VehiclePosition position) {
-		mongoDb.insert(position);
+		VehicleBuilder vb = new VehicleBuilder();
+		VehiclePosition newPos = vb.withVehiclePostion(position).build();
+		mongoDb.insert(newPos);
 	}
 
 	@Override
@@ -49,14 +53,18 @@ public class DataMongoDbImpl implements Data {
 	}
 
 	@Override
-	public Collection<VehiclePosition> getLatestPositionsOfAllVehiclesUpdatedSince(Date since) {
-		return mongoDb.findByTimestampAfter(since);
-	}
-
-	@Override
-	public TreeSet<VehiclePosition> getAllReportsForVehicleSince(String name, Date timestamp)
-			throws VehicleNotFoundException {
-		return new TreeSet<VehiclePosition>(mongoDb.findByNameAndTimestampAfter(name, timestamp));
+	public Collection<VehiclePosition> getLatestPositionsOfAllVehicles() {
+		List<String> allNames = mongoDb.findDistinctNames();
+		List<VehiclePosition> results = new ArrayList<>();
+		for (String next: allNames)
+		{
+			try {
+				results.add(getLatestPositionFor(next));
+			} catch (VehicleNotFoundException e) {
+				throw new RuntimeException(e);
+			}
+		}
+		return results; 
 	}
 
 	@Override
